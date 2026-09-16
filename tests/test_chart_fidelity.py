@@ -26,3 +26,14 @@ def test_chart_that_corrupts_exact_zero_is_refused():
     cov = np.array([[0.0, 0.0], [0.0, 1.0]])
     with pytest.raises(ValueError):
         push_covariance(t, cov, name="P")
+
+
+def test_transform_state_refuses_origin_cancellation_on_exact_zero():
+    chart = AffineCoordinates(
+        T=np.array([[1.0, 0.3], [0.0, 1.0]]),
+        S=np.eye(2),
+        input_offset=[1e20, 0.0],
+    )
+    state = GaussianState([0.0, 1.0], np.zeros((2, 2)))
+    with pytest.raises(ValueError, match="round trip"):
+        transform_state(state, chart)
