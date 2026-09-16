@@ -64,6 +64,28 @@ PYTHONPATH=src pytest -q
 
 The quickstart writes `results/quickstart.md`.
 
+## Role next to CSE, RCI, and the torus
+
+This package owns A2–A5 as code. Domain repos wrap types. Consumption is
+one way: they may pin a git SHA of *this* repo. This package does not
+import GAT, RCI, or `flat_torus`.
+
+The CSE experiment harness binds *record* digests from RCI and the torus.
+It does not put `sensitivity` in an SP1 guest. A later integer check of
+`P' = T P T^T` on a tiny declared matrix would still be a GAT satellite,
+not a rewrite of this kernel.
+
+Experiment here:
+
+```bash
+uv run --python 3.13 python examples/quickstart.py
+```
+
+Then, in a consumer, wrap `jacobian_at` / `first_order_covariance` /
+`push_covariance`. Do not fork those names.
+
+See [docs/KERNEL.md](docs/KERNEL.md).
+
 ## Library layout
 
 ```text
