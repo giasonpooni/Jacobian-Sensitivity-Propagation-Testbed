@@ -47,3 +47,9 @@ Add freely behind them. Do not rename to sound like GAT or FSRT.
 
 When FSRT or GAT adds an ndarray helper that exists after deleting domain names,
 the review question is why it is not an import.
+
+## What this repo is not
+
+SP1 does not live here. An instrument observation digest does not live here.
+A torus report digest does not live here. Those are record or guest objects.
+JSPT takes arrays and a law.
