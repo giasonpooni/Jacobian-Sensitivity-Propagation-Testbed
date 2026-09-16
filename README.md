@@ -13,6 +13,24 @@ Its central question is:
 > model—and does that answer remain consistent when we compose or
 > re-express the model?
 
+## Map
+
+```mermaid
+flowchart LR
+  X["x"] --> F["f"]
+  F --> Y["y"]
+  X --> J["J = Df"]
+  J --> DY["dy ~ J dx"]
+  T["chart T, S"] --> JP["J' = S J T^{-1}"]
+  J --> JP
+  JP --> Phys["J' dx' = S J dx"]
+  Cond{"kappa2(T) too large?"} -->|yes| Refuse["refuse · no clip"]
+  T --> Cond
+```
+
+Caption: raw entries of J are not invariants. Physical pushforward is.
+Covariance in a closed chart class only. This repo does not own V, IFC, or proofs.
+
 ## What is in the first release
 
 | Responsibility | What the testbed demonstrates |
