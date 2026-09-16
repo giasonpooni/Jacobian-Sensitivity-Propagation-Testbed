@@ -16,8 +16,6 @@ JacobianSource = Literal["analytical", "central", "forward", "complex", "jax", "
 
 @dataclass(frozen=True)
 class JacobianEstimate:
-    """A Jacobian together with the method used to obtain it."""
-
     matrix: Array
     source: str
     point: Array
@@ -26,6 +24,10 @@ class JacobianEstimate:
     @property
     def shape(self) -> tuple[int, int]:
         return tuple(self.matrix.shape)  # type: ignore[return-value]
+
+    @property
+    def condition_number(self) -> float:
+        return float(np.linalg.cond(self.matrix))
 
 
 def jvp(jacobian: ArrayLike, dx: ArrayLike) -> Array:
