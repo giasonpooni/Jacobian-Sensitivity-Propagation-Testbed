@@ -38,7 +38,10 @@ class DifferentiableModel:
         Declared dimensions. Evaluations are checked against these.
     jacobian:
         Optional analytical Jacobian ``df/dx`` at ``x``. When omitted the
-        testbed falls back to finite differences or an AD backend.
+        testbed falls back to finite differences.
+    jax_forward:
+        Optional JAX-traceable sibling of ``forward``. Required for
+        ``source='jax'``. A NumPy closure is not treated as traceable.
     input_names, output_names:
         Optional coordinate labels. They do not change numerics; they make
         permutation and unit tests readable.
@@ -51,6 +54,7 @@ class DifferentiableModel:
     input_dim: int
     output_dim: int
     jacobian: JacobianFn | None = None
+    jax_forward: ForwardFn | None = None
     input_names: tuple[str, ...] = ()
     output_names: tuple[str, ...] = ()
     notes: str = ""
@@ -102,6 +106,7 @@ class DifferentiableModel:
             input_dim=self.input_dim,
             output_dim=self.output_dim,
             jacobian=jacobian,
+            jax_forward=self.jax_forward,
             input_names=self.input_names,
             output_names=self.output_names,
             notes=self.notes,

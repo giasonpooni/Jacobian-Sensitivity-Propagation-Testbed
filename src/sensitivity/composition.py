@@ -18,7 +18,7 @@ def compose(
     *,
     name: str | None = None,
 ) -> DifferentiableModel:
-    """Build ``F = f_n o ... o f_1`` with a chain-rule Jacobian when possible.
+    """Build F = f_n o ... o f_1 with a chain-rule Jacobian when possible.
 
     Stage order is application order: ``models[0]`` is applied first.
     Adjacent dimensions must match. If every stage declares an analytical
@@ -42,9 +42,17 @@ def compose(
         return value
 
     analytical = all(stage.jacobian is not None for stage in stages)
+    traceable = all(stage.jax_forward is not None for stage in stages)
 
     def jacobian(x: Array) -> Array:
         return chain_rule_jacobian(stages, x, source="analytical" if analytical else "auto")
+
+    def jax_forward(x: Array) -> Array:
+        value = x
+        for stage in stages:
+            assert stage.jax_forward is not None
+            value = stage.jax_forward(value)
+        return value
 
     return DifferentiableModel(
         name=composed_name,
@@ -52,6 +60,7 @@ def compose(
         input_dim=first.input_dim,
         output_dim=last.output_dim,
         jacobian=jacobian if analytical else None,
+        jax_forward=jax_forward if traceable else None,
         input_names=first.input_names,
         output_names=last.output_names,
         notes="composed map; Jacobian uses the chain rule through declared stages",
@@ -65,7 +74,7 @@ def chain_rule_jacobian(
     *,
     source: str = "auto",
 ) -> Array:
-    """``J_F(x) = J_{f_n}(x_{n-1}) ... J_{f_1}(x)``."""
+    """J_F(x) = J_fn(x_{n-1}) ... J_f1(x)."""
     stages = require_models(models)
     value = np.asarray(x, dtype=float)
     pieces: list[Array] = []

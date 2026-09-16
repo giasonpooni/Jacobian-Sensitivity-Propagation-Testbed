@@ -11,6 +11,7 @@ from .checks import (
     check_coordinate_consistency,
     check_covariance_affine,
     check_derivative,
+    check_metric_consistency,
 )
 from .composition import compose
 from .coordinates import (
@@ -29,9 +30,11 @@ from .jacobian import (
     JacobianEstimate,
     finite_difference_jacobian,
     jacobian_at,
+    jax_is_available,
     jvp,
     vjp,
 )
+from .metrics import DeclaredMetric
 from .models import DifferentiableModel
 from .perturbation import (
     PerturbationSweep,
@@ -45,6 +48,7 @@ __all__ = [
     "AffineCoordinates",
     "CheckResult",
     "CovarianceExperiment",
+    "DeclaredMetric",
     "DifferentiableModel",
     "JacobianEstimate",
     "PerturbationSweep",
@@ -54,10 +58,12 @@ __all__ = [
     "check_coordinate_consistency",
     "check_covariance_affine",
     "check_derivative",
+    "check_metric_consistency",
     "compose",
     "finite_difference_jacobian",
     "first_order_covariance",
     "jacobian_at",
+    "jax_is_available",
     "jvp",
     "local_validity",
     "monte_carlo_covariance",
