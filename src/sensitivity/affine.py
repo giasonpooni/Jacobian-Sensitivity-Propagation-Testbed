@@ -12,7 +12,13 @@ from dataclasses import dataclass
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
-from .coordinates import AffineCoordinates, apply_input_map, invert_input_map
+from .coordinates import (
+    AffineCoordinates,
+    apply_input_map,
+    check_mean_fidelity,
+    invert_input_map,
+    push_covariance,
+)
 from .covariance import first_order_covariance, _require_psd
 from .models import as_vector
 
@@ -165,7 +171,9 @@ def transform_state(state: GaussianState, coordinates: AffineCoordinates) -> Gau
     if coordinates.T.shape[0] != state.dim:
         raise ValueError("chart T does not match the state")
     mean = apply_input_map(state.mean, coordinates)
-    covariance = coordinates.T @ state.covariance @ coordinates.T.T
+    recovered = invert_input_map(mean, coordinates)
+    check_mean_fidelity(state.mean, recovered, state.covariance, "state mean")
+    covariance = push_covariance(coordinates.T, state.covariance, name="state covariance")
     return GaussianState(mean, covariance)
 
 
@@ -173,8 +181,11 @@ def restore_state(state: GaussianState, coordinates: AffineCoordinates) -> Gauss
     if coordinates.T.shape[0] != state.dim:
         raise ValueError("chart T does not match the state")
     mean = invert_input_map(state.mean, coordinates)
-    t_inv = coordinates.T_inv
-    covariance = t_inv @ state.covariance @ t_inv.T
+    recovered = apply_input_map(mean, coordinates)
+    check_mean_fidelity(state.mean, recovered, state.covariance, "state mean")
+    covariance = push_covariance(
+        coordinates.T, state.covariance, inverse=True, name="state covariance"
+    )
     return GaussianState(mean, covariance)
 
 
@@ -189,8 +200,10 @@ def transform_plant(plant: AffinePlant, coordinates: AffineCoordinates) -> Affin
     b = coordinates.output_offset
     f_prime = t @ plant.F @ t_inv
     drift_prime = t @ plant.drift + c - f_prime @ c
-    q_prime = t @ plant.Q @ t.T
+    recovered_drift = t_inv @ (drift_prime - c + f_prime @ c)
+    check_mean_fidelity(plant.drift, recovered_drift, plant.Q, "dynamics drift")
+    q_prime = push_covariance(t, plant.Q, name="Q")
     h_prime = s @ plant.H @ t_inv
     offset_prime = s @ plant.offset + b - h_prime @ c
-    r_prime = s @ plant.R @ s.T
+    r_prime = push_covariance(s, plant.R, name="R")
     return AffinePlant(f_prime, drift_prime, q_prime, h_prime, offset_prime, r_prime)
