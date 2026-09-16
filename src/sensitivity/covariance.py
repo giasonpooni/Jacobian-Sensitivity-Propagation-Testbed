@@ -1,14 +1,4 @@
-"""First-order covariance propagation and Monte Carlo comparison.
-
-The map
-
-    Sigma_y ~ J(mu_x) Sigma_x J(mu_x)^T
-
-is exact for an affine model with the stated covariance. For a nonlinear
-model it inherits the same local limitation as ``dy ~ J dx``. The testbed
-measures that gap; it does not treat the first-order formula as a second
-interpretation of covariance.
-"""
+"""First-order covariance propagation and Monte Carlo comparison."""
 
 from __future__ import annotations
 
@@ -21,23 +11,40 @@ from .jacobian import jacobian_at
 from .models import DifferentiableModel, as_vector
 
 Array = NDArray[np.floating]
+_PSD_REL_TOL = 1e-12
 
 
-def _require_spd(matrix: Array, name: str) -> Array:
+def _require_psd(matrix: Array, name: str) -> Array:
     cov = np.asarray(matrix, dtype=float)
     if cov.ndim != 2 or cov.shape[0] != cov.shape[1]:
         raise ValueError(f"{name} must be square")
-    if not np.allclose(cov, cov.T, atol=1e-12):
-        raise ValueError(f"{name} must be symmetric")
-    eig = np.linalg.eigvalsh(cov)
-    if np.any(eig < -1e-10):
-        raise ValueError(f"{name} must be positive semidefinite")
+    if not np.all(np.isfinite(cov)):
+        raise ValueError(f"{name} must contain finite numbers")
+    variances = np.diag(cov)
+    if np.any(variances < 0.0):
+        raise ValueError(f"{name} variances must be nonnegative")
+    zero = variances == 0.0
+    if np.any(cov[zero, :] != 0.0) or np.any(cov[:, zero] != 0.0):
+        raise ValueError(f"{name} zero-variance rows must have zero cross-covariance")
+    positive = ~zero
+    if np.any(positive):
+        scales = np.sqrt(variances[positive])
+        with np.errstate(over="ignore", invalid="ignore", divide="ignore"):
+            correlation = cov[np.ix_(positive, positive)] / scales[:, None] / scales[None, :]
+        if not np.all(np.isfinite(correlation)):
+            raise ValueError(f"{name} has invalid normalized correlations")
+        if not np.allclose(correlation, correlation.T, rtol=1e-10, atol=1e-12):
+            raise ValueError(f"{name} must be symmetric in correlation coordinates")
+        correlation = 0.5 * correlation + 0.5 * correlation.T
+        eigenvalues = np.linalg.eigvalsh(correlation)
+        if eigenvalues[0] < -_PSD_REL_TOL * float(np.max(np.abs(eigenvalues))):
+            raise ValueError(f"{name} must be positive semidefinite")
     return 0.5 * (cov + cov.T)
 
 
 def first_order_covariance(jacobian: ArrayLike, sigma_x: ArrayLike) -> Array:
     jac = np.asarray(jacobian, dtype=float)
-    cov = _require_spd(np.asarray(sigma_x, dtype=float), "Sigma_x")
+    cov = _require_psd(np.asarray(sigma_x, dtype=float), "Sigma_x")
     if jac.ndim != 2 or jac.shape[1] != cov.shape[0]:
         raise ValueError(f"J is {jac.shape}, Sigma_x is {cov.shape}")
     return jac @ cov @ jac.T
@@ -52,13 +59,15 @@ def monte_carlo_covariance(
     rng: np.random.Generator | None = None,
 ) -> Array:
     mu = as_vector(mean, "mean")
-    cov = _require_spd(np.asarray(sigma_x, dtype=float), "Sigma_x")
+    cov = _require_psd(np.asarray(sigma_x, dtype=float), "Sigma_x")
     if mu.size != model.input_dim or cov.shape[0] != model.input_dim:
         raise ValueError("mean and Sigma_x must match the model input dimension")
     if samples < 2:
         raise ValueError("samples must be at least 2")
     engine = rng or np.random.default_rng(0)
-    draws = engine.multivariate_normal(mu, cov, size=samples)
+    evals, evecs = np.linalg.eigh(cov)
+    evals = np.maximum(evals, 0.0)
+    draws = mu + (engine.standard_normal((samples, mu.size)) * np.sqrt(evals)) @ evecs.T
     outputs = np.vstack([model.evaluate(row) for row in draws])
     centered = outputs - outputs.mean(axis=0)
     return (centered.T @ centered) / (samples - 1)
@@ -87,9 +96,7 @@ def run_covariance_experiment(
     mu = as_vector(mean, "mean")
     jac = jacobian_at(model, mu, source=source)  # type: ignore[arg-type]
     linear = first_order_covariance(jac.matrix, sigma_x)
-    empirical = monte_carlo_covariance(
-        model, mu, sigma_x, samples=samples, rng=rng
-    )
+    empirical = monte_carlo_covariance(model, mu, sigma_x, samples=samples, rng=rng)
     gap = linear - empirical
     fro = float(np.linalg.norm(gap, ord="fro"))
     denom = max(float(np.linalg.norm(empirical, ord="fro")), 1e-16)
