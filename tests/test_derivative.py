@@ -16,6 +16,11 @@ def test_analytical_matches_central_on_catalogue():
         "polar": np.array([1.2, 0.4]),
         "scaled-rotation": np.array([0.5, -0.8]),
         "two-tank": np.array([12.0, 8.0, 1.1]),
+        "storage": np.array([1.2, 0.8]),
+        "balance": np.array([12.0, 8.0]),
+        "gauge-totalizer": np.array([12.0, 8.0]),
+        "fluid-balance": np.array([1.2, 0.8]),
+        "fluid-observer": np.array([1.2, 0.8]),
     }
     for name, model in catalogue.items():
         result = check_derivative(model, points[name], against="central")
