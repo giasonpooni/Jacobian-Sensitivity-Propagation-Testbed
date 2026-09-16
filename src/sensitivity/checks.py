@@ -11,6 +11,7 @@ from .composition import chain_rule_jacobian, compose
 from .coordinates import AffineCoordinates, apply_input_map, transform_jacobian, transform_model
 from .covariance import first_order_covariance, run_covariance_experiment
 from .jacobian import jacobian_at, jvp
+from .metrics import DeclaredMetric
 from .models import DifferentiableModel, as_vector
 
 Array = NDArray[np.floating]
@@ -99,12 +100,7 @@ def check_coordinate_consistency(
     rtol: float = 1e-7,
     source: str = "auto",
 ) -> CheckResult:
-    """Compare physical predictions after a consistent change of coordinates.
-
-    The test does not require ``J`` and ``J'`` to have the same entries.
-    It requires ``J' dx' = S (J dx)`` and agreement of the transformed
-    model evaluation with ``S f(x)``.
-    """
+    """Compare physical predictions after a consistent change of coordinates."""
     point = as_vector(x, "x")
     delta = as_vector(dx, "dx")
     jac = jacobian_at(model, point, source=source).matrix  # type: ignore[arg-type]
@@ -113,7 +109,6 @@ def check_coordinate_consistency(
     left = jvp(primed_jac, dx_prime)
     right = coordinates.S @ jvp(jac, delta)
     map_residual = _residual_norm(left, right)
-
     transformed = transform_model(model, coordinates)
     x_prime = apply_input_map(point, coordinates)
     value_residual = _residual_norm(
@@ -174,6 +169,48 @@ def check_covariance_affine(
             f"relative={experiment.relative_gap:.3e}, n={experiment.samples}"
         ),
         extra={"relative_gap": experiment.relative_gap},
+    )
+
+
+def check_metric_consistency(
+    model: DifferentiableModel,
+    x: ArrayLike,
+    coordinates: AffineCoordinates,
+    metric: DeclaredMetric,
+    *,
+    atol: float = 1e-8,
+    rtol: float = 1e-7,
+    source: str = "auto",
+) -> CheckResult:
+    """Compare scaled operator gains after pushing the metric with the chart."""
+    point = as_vector(x, "x")
+    jac = jacobian_at(model, point, source=source).matrix  # type: ignore[arg-type]
+    primed_jac = transform_jacobian(jac, coordinates)
+    pushed = metric.push(coordinates)
+    gain = metric.operator_gain(jac)
+    primed_gain = pushed.operator_gain(primed_jac)
+    scaled = metric.scale_jacobian(jac)
+    primed_scaled = pushed.scale_jacobian(primed_jac)
+    left_svals = np.sort(np.linalg.svd(scaled, compute_uv=False))
+    right_svals = np.sort(np.linalg.svd(primed_scaled, compute_uv=False))
+    residual = float(np.linalg.norm(left_svals - right_svals))
+    passed = residual <= atol + rtol * max(float(np.linalg.norm(left_svals)), 1e-16)
+    return CheckResult(
+        name=f"metric:{model.name}:{coordinates.name}:{metric.name}",
+        passed=passed,
+        residual=residual,
+        details=(
+            f"unscaled ||J||_2={float(np.linalg.norm(jac, ord=2)):.3e}, "
+            f"||J'||_2={float(np.linalg.norm(primed_jac, ord=2)):.3e}; "
+            f"scaled gains {gain:.6g} vs {primed_gain:.6g}"
+        ),
+        extra={
+            "gain": gain,
+            "primed_gain": primed_gain,
+            "unscaled_ratio": float(
+                np.linalg.norm(primed_jac, ord=2) / max(np.linalg.norm(jac, ord=2), 1e-16)
+            ),
+        },
     )
 
 
