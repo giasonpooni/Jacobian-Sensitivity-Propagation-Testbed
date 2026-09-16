@@ -211,6 +211,41 @@ def two_tank_measurement(*, name: str = "gauge-totalizer") -> DifferentiableMode
     )
 
 
+def simply_supported_midspan(*, name: str = "beam-midspan") -> DifferentiableModel:
+    """Central deflection delta = P L^3 / (48 EI).
+
+    Portable construction fragment. Not GAT, not AISC capacity.
+    """
+
+    def forward(vec: Array) -> Array:
+        load, length, stiffness = vec
+        if stiffness <= 0.0:
+            raise ValueError("EI must be positive")
+        return np.array([load * length**3 / (48.0 * stiffness)])
+
+    def jacobian(vec: Array) -> Array:
+        load, length, stiffness = vec
+        if stiffness <= 0.0:
+            raise ValueError("EI must be positive")
+        return np.array([[
+            length**3 / (48.0 * stiffness),
+            3.0 * load * length**2 / (48.0 * stiffness),
+            -load * length**3 / (48.0 * stiffness**2),
+        ]])
+
+    return DifferentiableModel(
+        name=name,
+        forward=forward,
+        input_dim=3,
+        output_dim=1,
+        jacobian=jacobian,
+        input_names=("P", "L", "EI"),
+        output_names=("delta",),
+        notes="Euler-Bernoulli midspan formula; no shear, no support settlement",
+        tags=("analytical", "construction-example", "nonlinear"),
+    )
+
+
 def reference_catalogue() -> dict[str, DifferentiableModel]:
     from .composition import compose
 
@@ -227,4 +262,5 @@ def reference_catalogue() -> dict[str, DifferentiableModel]:
         "gauge-totalizer": two_tank_measurement(),
         "fluid-balance": compose([storage, two_tank_balance()], name="fluid-balance"),
         "fluid-observer": compose([storage, two_tank_measurement()], name="fluid-observer"),
+        "beam-midspan": simply_supported_midspan(),
     }
