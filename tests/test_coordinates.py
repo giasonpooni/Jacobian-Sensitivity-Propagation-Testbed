@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
 from sensitivity.checks import check_coordinate_consistency
 from sensitivity.coordinates import AffineCoordinates, transform_jacobian
@@ -18,6 +19,11 @@ def test_unit_change_preserves_physical_prediction():
     assert not np.allclose(raw, primed)
     result = check_coordinate_consistency(model, x, coords, dx)
     assert result.passed, result.details
+
+
+def test_ill_conditioned_chart_is_refused():
+    with pytest.raises(ValueError, match="condition"):
+        AffineCoordinates(T=[[1.0, 1.0], [1.0, 1.0 + 1e-16]], S=np.eye(2))
 
 
 def test_permutation_consistency():

@@ -20,6 +20,28 @@ from .models import DifferentiableModel, as_vector
 
 Array = NDArray[np.floating]
 
+MAX_CONDITION_NUMBER = 1e12
+ROUND_TRIP_TOLERANCE = 1e-8
+
+
+def _require_chart(matrix: ArrayLike, name: str) -> Array:
+    value = np.asarray(matrix, dtype=float)
+    if value.ndim != 2 or value.shape[0] != value.shape[1] or value.shape[0] == 0:
+        raise ValueError(f"{name} must be a nonempty square matrix")
+    if not np.all(np.isfinite(value)):
+        raise ValueError(f"{name} must contain finite numbers")
+    try:
+        condition = float(np.linalg.cond(value))
+    except np.linalg.LinAlgError as exc:
+        raise ValueError(f"{name} condition could not be resolved") from exc
+    if not np.isfinite(condition) or condition > MAX_CONDITION_NUMBER:
+        raise ValueError(f"{name} must be invertible with condition number <= 1e12")
+    identity = np.eye(value.shape[0])
+    recovered = np.linalg.solve(value, value @ identity)
+    if float(np.max(np.abs(recovered - identity))) > ROUND_TRIP_TOLERANCE:
+        raise ValueError(f"{name} loses precision in the coordinate round trip")
+    return value
+
 
 @dataclass(frozen=True)
 class AffineCoordinates:
@@ -30,26 +52,24 @@ class AffineCoordinates:
     name: str = "coordinates"
 
     def __post_init__(self) -> None:
-        t = np.asarray(self.T, dtype=float)
-        s = np.asarray(self.S, dtype=float)
-        object.__setattr__(self, "T", t)
-        object.__setattr__(self, "S", s)
-        if t.ndim != 2 or t.shape[0] != t.shape[1]:
-            raise ValueError("T must be a square matrix")
-        if s.ndim != 2 or s.shape[0] != s.shape[1]:
-            raise ValueError("S must be a square matrix")
-        if abs(np.linalg.det(t)) < 1e-14:
-            raise ValueError("T must be invertible")
-        if abs(np.linalg.det(s)) < 1e-14:
-            raise ValueError("S must be invertible")
+        object.__setattr__(self, "T", _require_chart(self.T, "T"))
+        object.__setattr__(self, "S", _require_chart(self.S, "S"))
 
     @property
     def T_inv(self) -> Array:
-        return np.linalg.inv(self.T)
+        return np.linalg.solve(self.T, np.eye(self.T.shape[0]))
 
     @property
     def S_inv(self) -> Array:
-        return np.linalg.inv(self.S)
+        return np.linalg.solve(self.S, np.eye(self.S.shape[0]))
+
+    @property
+    def T_condition(self) -> float:
+        return float(np.linalg.cond(self.T))
+
+    @property
+    def S_condition(self) -> float:
+        return float(np.linalg.cond(self.S))
 
     @classmethod
     def scale(cls, input_scales: ArrayLike, output_scales: ArrayLike, name: str = "units") -> AffineCoordinates:
@@ -74,7 +94,6 @@ class AffineCoordinates:
 
 
 def transform_jacobian(jacobian: ArrayLike, coordinates: AffineCoordinates) -> Array:
-    """``J' = S J T^{-1}``."""
     jac = np.asarray(jacobian, dtype=float)
     if jac.shape != (coordinates.S.shape[0], coordinates.T.shape[0]):
         raise ValueError(
@@ -98,10 +117,6 @@ def transform_model(
     *,
     name: str | None = None,
 ) -> DifferentiableModel:
-    """Return the same physical map expressed in primed coordinates.
-
-    ``y' = S f(T^{-1} x')``.
-    """
     if coordinates.T.shape[0] != model.input_dim:
         raise ValueError("T does not match model input dimension")
     if coordinates.S.shape[0] != model.output_dim:

@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
 from sensitivity.checks import check_covariance_affine
-from sensitivity.covariance import run_covariance_experiment
+from sensitivity.covariance import first_order_covariance, run_covariance_experiment
 from sensitivity.reference_models import reference_catalogue
 
 
@@ -13,6 +14,12 @@ def test_affine_covariance_matches_monte_carlo():
     sigma = np.array([[0.04, 0.01], [0.01, 0.09]])
     result = check_covariance_affine(model, mean, sigma, samples=8000, seed=1)
     assert result.passed, result.details
+
+
+def test_zero_variance_row_must_be_exactly_zero():
+    jac = np.eye(2)
+    with pytest.raises(ValueError, match="zero-variance"):
+        first_order_covariance(jac, [[0.0, 0.1], [0.1, 1.0]])
 
 
 def test_nonlinear_covariance_gap_grows_with_spread():

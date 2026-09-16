@@ -21,6 +21,7 @@ def test_analytical_matches_central_on_catalogue():
         "gauge-totalizer": np.array([12.0, 8.0]),
         "fluid-balance": np.array([1.2, 0.8]),
         "fluid-observer": np.array([1.2, 0.8]),
+        "beam-midspan": np.array([10.0, 4.0, 2.0e4]),
     }
     for name, model in catalogue.items():
         result = check_derivative(model, points[name], against="central")
