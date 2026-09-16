@@ -5,6 +5,17 @@ models, and reports live beside it in the repository; consuming projects
 can depend on ``sensitivity`` without adopting the experiment suite.
 """
 
+from .affine import (
+    AffinePlant,
+    GaussianState,
+    invariant_error,
+    predict,
+    restore_state,
+    retract,
+    transform_plant,
+    transform_state,
+    update,
+)
 from .checks import (
     CheckResult,
     check_composition,
@@ -15,9 +26,14 @@ from .checks import (
 )
 from .composition import compose
 from .coordinates import (
+    MAX_CONDITION_NUMBER,
+    ROUND_TRIP_TOLERANCE,
     AffineCoordinates,
     apply_input_map,
     apply_output_map,
+    check_covariance_fidelity,
+    check_mean_fidelity,
+    push_covariance,
     transform_jacobian,
 )
 from .covariance import (
@@ -43,35 +59,52 @@ from .perturbation import (
     sweep_perturbation_scale,
 )
 from .reference_models import reference_catalogue
+from .structure import local_structure, propagate_belief
 
 __all__ = [
     "AffineCoordinates",
+    "AffinePlant",
     "CheckResult",
     "CovarianceExperiment",
     "DeclaredMetric",
     "DifferentiableModel",
+    "GaussianState",
     "JacobianEstimate",
+    "MAX_CONDITION_NUMBER",
     "PerturbationSweep",
+    "ROUND_TRIP_TOLERANCE",
     "apply_input_map",
     "apply_output_map",
     "check_composition",
     "check_coordinate_consistency",
     "check_covariance_affine",
+    "check_covariance_fidelity",
     "check_derivative",
+    "check_mean_fidelity",
     "check_metric_consistency",
     "compose",
     "finite_difference_jacobian",
     "first_order_covariance",
+    "invariant_error",
     "jacobian_at",
     "jax_is_available",
     "jvp",
+    "local_structure",
     "local_validity",
     "monte_carlo_covariance",
     "perturbation_error",
+    "predict",
+    "propagate_belief",
+    "push_covariance",
     "reference_catalogue",
+    "restore_state",
+    "retract",
     "run_covariance_experiment",
     "sweep_perturbation_scale",
     "transform_jacobian",
+    "transform_plant",
+    "transform_state",
+    "update",
     "vjp",
 ]
 
