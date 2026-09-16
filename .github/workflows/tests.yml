@@ -32,7 +32,9 @@ jobs:
         run: uv run --python ${{ matrix.python }} python examples/quickstart.py
       - name: Run fluid composition example
         run: uv run --python ${{ matrix.python }} python examples/fluid_composition.py
+      - name: Run construction composition example
+        run: uv run --python ${{ matrix.python }} python examples/construction_composition.py
       - name: Build package
         run: uv build --python ${{ matrix.python }}
       - name: Run default suite
-        run: uv run --python ${{ matrix.python }} --with pytest pytest -q
+        run: uv run --python ${{ matrix.python }} --dev pytest -q

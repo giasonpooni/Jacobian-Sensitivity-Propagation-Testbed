@@ -23,4 +23,5 @@ packages = ["src/sensitivity"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-q"
+markers = ["slow: full-size remainder or Monte Carlo runs; select with -m slow"]
+addopts = "-q -m 'not slow'"
