@@ -29,7 +29,6 @@ class JacobianEstimate:
 
 
 def jvp(jacobian: ArrayLike, dx: ArrayLike) -> Array:
-    """Push a perturbation through ``J``: ``dy ~ J dx``."""
     jac = np.asarray(jacobian, dtype=float)
     delta = as_vector(dx, "dx")
     if jac.ndim != 2:
@@ -40,7 +39,6 @@ def jvp(jacobian: ArrayLike, dx: ArrayLike) -> Array:
 
 
 def vjp(jacobian: ArrayLike, dy: ArrayLike) -> Array:
-    """Pull a cotangent through ``J``: ``dxtilde = J^T dy``."""
     jac = np.asarray(jacobian, dtype=float)
     cotan = as_vector(dy, "dy")
     if jac.ndim != 2:
@@ -61,17 +59,9 @@ def finite_difference_jacobian(
     method: Literal["central", "forward", "complex"] = "central",
     relative_step: float | None = None,
 ) -> JacobianEstimate:
-    """Approximate ``df/dx`` without requiring an analytical formula.
-
-    Central differences are the default. Complex-step differentiation is
-    available when ``f`` accepts a complex probe and returns a complex
-    value whose real part is ``f(x)``. It is exact to first order in the
-    rounding of ``f`` for holomorphic real-on-real maps.
-    """
     point = as_vector(x, "x")
     if point.size != model.input_dim:
         raise ValueError(f"expected input dim {model.input_dim}, got {point.size}")
-
     if method == "complex":
         step_scale = 1e-20 if relative_step is None else relative_step
         steps = _default_step(point, step_scale)
@@ -82,9 +72,8 @@ def finite_difference_jacobian(
             value = np.asarray(model.forward(probe), dtype=complex)
             if value.ndim == 0:
                 value = value.reshape(1)
-            jac[:, i] = np.real(value) * 0.0 + np.imag(value) / steps[i]
+            jac[:, i] = np.imag(value) / steps[i]
         return JacobianEstimate(matrix=jac, source="complex", point=point, step=steps)
-
     if relative_step is None:
         relative_step = 1.5e-6 if method == "central" else 1.0e-6
     steps = _default_step(point, relative_step)
@@ -104,21 +93,34 @@ def finite_difference_jacobian(
     return JacobianEstimate(matrix=jac, source=method, point=point, step=steps)
 
 
+def jax_is_available() -> bool:
+    try:
+        import jax  # noqa: F401
+    except ImportError:
+        return False
+    return True
+
+
 def _jax_jacobian(model: DifferentiableModel, x: Array) -> JacobianEstimate:
+    if model.jax_forward is None:
+        raise RuntimeError(
+            f"{model.name} has no jax_forward; source='jax' is only used "
+            "on maps that declare a traceable sibling, not on NumPy closures"
+        )
     try:
         import jax
         import jax.numpy as jnp
-    except ImportError as exc:  # pragma: no cover - optional backend
-        raise RuntimeError("jax is not installed; install the [ad] extra") from exc
+    except ImportError as exc:
+        raise RuntimeError("jax is not installed; install the optional [ad] extra") from exc
 
     def wrapped(vec):
-        return jnp.asarray(model.forward(np.asarray(vec, dtype=float)))
+        return jnp.asarray(model.jax_forward(vec))
 
-    try:
-        jac = np.asarray(jax.jacfwd(wrapped)(jnp.asarray(x, dtype=float)), dtype=float)
-        return JacobianEstimate(matrix=jac, source="jax", point=x)
-    except Exception:
-        return finite_difference_jacobian(model, x, method="central")
+    jac = np.asarray(jax.jacfwd(wrapped)(jnp.asarray(x, dtype=float)), dtype=float)
+    expected = (model.output_dim, model.input_dim)
+    if jac.shape != expected:
+        raise ValueError(f"{model.name}: JAX Jacobian shape {jac.shape} != {expected}")
+    return JacobianEstimate(matrix=jac, source="jax", point=x)
 
 
 def jacobian_at(
@@ -127,18 +129,9 @@ def jacobian_at(
     *,
     source: JacobianSource = "auto",
 ) -> JacobianEstimate:
-    """Return a Jacobian at ``x``.
-
-    ``source='auto'`` prefers a declared analytical Jacobian, then central
-    finite differences. An explicit method name forces that estimator.
-    """
     point = as_vector(x, "x")
     if source == "analytical":
-        return JacobianEstimate(
-            matrix=model.analytical_jacobian(point),
-            source="analytical",
-            point=point,
-        )
+        return JacobianEstimate(matrix=model.analytical_jacobian(point), source="analytical", point=point)
     if source in {"central", "forward", "complex"}:
         return finite_difference_jacobian(model, point, method=source)
     if source == "jax":
@@ -146,9 +139,5 @@ def jacobian_at(
     if source != "auto":
         raise ValueError(f"unknown Jacobian source {source!r}")
     if model.jacobian is not None:
-        return JacobianEstimate(
-            matrix=model.analytical_jacobian(point),
-            source="analytical",
-            point=point,
-        )
+        return JacobianEstimate(matrix=model.analytical_jacobian(point), source="analytical", point=point)
     return finite_difference_jacobian(model, point, method="central")
