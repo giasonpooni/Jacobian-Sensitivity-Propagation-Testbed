@@ -1,0 +1,24 @@
+{
+  "schema": "invariant-corpus-v1",
+  "claim_scope": "computational-integrity-only",
+  "cites": "giasonpooni/Construction-State-Estimator-for-BIM",
+  "invariants": [
+    {
+      "id": "pin.chain-jvp-i32",
+      "kind": "numeric",
+      "y": [5, 3]
+    },
+    {
+      "id": "alg.no-duplicate",
+      "kind": "pin",
+      "statement": "adapter lands only if local TFT-1 / TPT-T is deleted in the same PR."
+    }
+  ],
+  "free_coordinates": [
+    {
+      "id": "var.dx",
+      "quantity": "tangent",
+      "needs": ["declared-J"]
+    }
+  ]
+}
