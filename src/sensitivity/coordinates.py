@@ -35,6 +35,13 @@ def _require_chart(matrix: ArrayLike, name: str) -> Array:
     return value
 
 
+def skeel_condition(matrix: ArrayLike) -> float:
+    """Componentwise Skeel condition || |A^{-1}| |A| ||_inf."""
+    value = np.asarray(matrix, dtype=float)
+    inverse = np.linalg.inv(value)
+    return float(np.linalg.norm(np.abs(inverse) @ np.abs(value), ord=np.inf))
+
+
 def check_mean_fidelity(reference, recovered, covariance, name: str) -> None:
     ref = as_vector(reference, name)
     rec = as_vector(recovered, f"round-trip {name}")
@@ -120,6 +127,14 @@ class AffineCoordinates:
     @property
     def S_condition(self) -> float:
         return float(np.linalg.cond(self.S))
+
+    @property
+    def T_skeel(self) -> float:
+        return skeel_condition(self.T)
+
+    @property
+    def S_skeel(self) -> float:
+        return skeel_condition(self.S)
 
     @classmethod
     def scale(cls, input_scales, output_scales, name: str = "units"):
